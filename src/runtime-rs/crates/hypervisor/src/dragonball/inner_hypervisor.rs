@@ -190,6 +190,14 @@ impl DragonballInner {
     }
 
     pub(crate) async fn get_jailer_root(&self) -> Result<String> {
+        // Mirror the directory creation already done in run_vmm_server():
+        // share-fs backends (e.g. the standalone virtiofsd daemon) call
+        // get_jailer_root() from setup_device_before_start_vm(), which runs
+        // before start_vm()/run_vmm_server() ever creates this directory.
+        // Without this, virtiofsd is launched with a --socket-path whose
+        // parent directory does not exist yet and exits immediately.
+        std::fs::create_dir_all(&self.jailer_root)
+            .map_err(|e| anyhow!("Failed to create dir {} err : {:?}", self.jailer_root, e))?;
         Ok(self.jailer_root.clone())
     }
 
