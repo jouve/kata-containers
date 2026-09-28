@@ -156,7 +156,18 @@ impl ShareVirtioFsStandalone {
         tokio::spawn(run_virtiofsd(child, tx));
 
         // TODO: support timeout
-        match rx.recv().await.unwrap() {
+        //
+        // rx.recv() returns None if the sender is dropped without sending,
+        // which happens when virtiofsd exits (successfully or not) before
+        // ever printing the "Waiting for vhost-user socket connection" line
+        // -- e.g. when it fails to start because its socket directory does
+        // not exist. Treat that the same as a reported failure instead of
+        // panicking the shim.
+        match rx
+            .recv()
+            .await
+            .unwrap_or_else(|| Err(anyhow!("virtiofsd exited before reporting its status")))
+        {
             Ok(_) => {
                 info!(sl!(), "start virtiofsd successfully");
                 Ok(())
